@@ -1,12 +1,6 @@
-import { Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { Slot } from "expo-router";
+import "../global.css";
 
 export default function RootLayout() {
-  return (
-    <SafeAreaView>
-      <View>
-        <Text>Welcome to Day One of the Rest of my Life.</Text>
-      </View>
-    </SafeAreaView>
-  );
+  return <Slot />;
 }
