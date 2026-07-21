@@ -19,8 +19,45 @@ export default function SignUp() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [showVerifier, setShowVerifier] = useState(false);
+  const [verificationFactor, setVerificationFactor] = useState<
+    "email_code" | "phone_code" | null
+  >(null);
 
   const isLoading = fetchStatus === "fetching";
+
+  const finalizeSignIn = async () => {
+    await signIn.finalize({
+      navigate: ({ session, decorateUrl }) => {
+        if (session?.currentTask) {
+          console.log(session?.currentTask);
+          return;
+        }
+        const url = decorateUrl("/");
+        router.replace(url as any);
+      },
+    });
+  };
+
+  const onVerifyPress = async () => {
+    if (verificationFactor === "phone_code") {
+      await signIn.mfa.verifyPhoneCode({ code });
+    } else if (verificationFactor === "email_code") {
+      await signIn.mfa.verifyEmailCode({ code });
+    }
+
+    if (signIn.status === "complete") {
+      await finalizeSignIn();
+    }
+  };
+
+  const onResendCode = async () => {
+    if (verificationFactor === "phone_code") {
+      await signIn.mfa.sendPhoneCode();
+    } else if (verificationFactor === "email_code") {
+      await signIn.mfa.sendEmailCode();
+    }
+  };
 
   const onSignInPress = async () => {
     const { error } = await signIn.password({
@@ -35,51 +72,37 @@ export default function SignUp() {
     }
 
     if (signIn.status === "complete") {
-      await signIn.finalize({
-        navigate: ({ session, decorateUrl }) => {
-          if (session?.currentTask) {
-            console.log(session?.currentTask);
-            return;
-          }
-          const url = decorateUrl("/");
-          router.replace(url as any);
-        },
-      });
+      await finalizeSignIn();
     } else if (signIn.status === "needs_second_factor") {
-      await signIn.mfa.sendPhoneCode();
+      const phoneFactor = signIn.supportedSecondFactors.find(
+        (factor) => factor.strategy === "phone_code",
+      );
+      if (phoneFactor) {
+        await signIn.mfa.sendPhoneCode();
+        setVerificationFactor("phone_code");
+        setShowVerifier(true);
+      }
     } else if (signIn.status === "needs_client_trust") {
       const emailCodeFactor = signIn.supportedSecondFactors.find(
         (factor) => factor.strategy === "email_code",
       );
       if (emailCodeFactor) {
         await signIn.mfa.sendEmailCode();
+        setVerificationFactor("email_code");
+        setShowVerifier(true);
       }
     } else {
       console.error("Sign in attempt not completed:", signIn);
     }
+  };
 
-    if (!error) await signIn.mfa.sendEmailCode();
-
-    const onVerifyPress = async () => {
-      await signIn.mfa.verifyEmailCode({
-        code,
-      });
-      if (signIn.status === "complete") {
-        await signIn.finalize({
-          navigate: ({ session, decorateUrl }) => {
-            if (session?.currentTask) {
-              console.log(session?.currentTask);
-              return;
-            }
-            const url = decorateUrl("/");
-            router.replace(url as any);
-          },
-        });
-      }
-    };
-
-    if (signIn.status === "needs_client_trust") {
-      return (
+  if (showVerifier && verificationFactor) {
+    return (
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        className="bg-white"
+        keyboardShouldPersistTaps="handled"
+      >
         <View className="flex-1 justify-center px-6 py-12">
           <Image
             source={require("../../assets/images/kribb.png")}
@@ -89,7 +112,11 @@ export default function SignUp() {
           <Text className="text-3xl font-bold text-gray-800 mb-2">
             Verify Your Account
           </Text>
-          <Text className="text-gray-500 mb-8">We sent a code to {email}</Text>
+          <Text className="text-gray-500 mb-8">
+            {verificationFactor === "phone_code"
+              ? "We sent a code to your phone"
+              : `We sent a code to ${email}`}
+          </Text>
           <TextInput
             className="flex-1 border border-gray-300 rounded-xl px-4 py-3"
             placeholder="Enter verification code"
@@ -116,16 +143,13 @@ export default function SignUp() {
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            onPress={() => signIn.mfa.sendEmailCode()}
-            className="py-2"
-          >
+          <TouchableOpacity onPress={onResendCode} className="py-2">
             <Text className="text-blue-600">I need a new code</Text>
           </TouchableOpacity>
         </View>
-      );
-    }
-  };
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView

@@ -25,9 +25,28 @@ export default function SignUp() {
 
   const isLoading = fetchStatus === "fetching";
 
+  const needsEmailVerification =
+    signUp.status === "missing_requirements" &&
+    signUp.unverifiedFields.includes("email_address") &&
+    signUp.missingFields.length === 0;
+
   if (signUp.status === "complete" || isSignedIn) {
     return null;
   }
+
+  const onVerifyPress = async () => {
+    await signUp.verifications.verifyEmailCode({
+      code,
+    });
+    if (signUp.status === "complete") {
+      await signUp.finalize({
+        navigate: ({ decorateUrl }) => {
+          const url = decorateUrl("/");
+          router.replace(url as any);
+        },
+      });
+    }
+  };
 
   const onSignUpPress = async () => {
     const { error } = await signUp.password({
@@ -43,32 +62,26 @@ export default function SignUp() {
       return;
     }
 
-    if (!error) await signUp.verifications.sendEmailCode();
-
-    const onVerifyPress = async () => {
-      await signUp.verifications.verifyEmailCode({
-        code,
-      });
-      if (signUp.status === "complete") {
-        await signUp.finalize({
-          navigate: ({ decorateUrl }) => {
-            const url = decorateUrl("/");
-            router.replace(url as any);
-          },
-        });
-      }
-    };
-
     if (
       signUp.status === "missing_requirements" &&
       signUp.unverifiedFields.includes("email_address") &&
       signUp.missingFields.length === 0
     ) {
-      return (
+      await signUp.verifications.sendEmailCode();
+    }
+  };
+
+  if (needsEmailVerification) {
+    return (
+      <ScrollView
+        contentContainerStyle={{ flexGrow: 1 }}
+        className="bg-white"
+        keyboardShouldPersistTaps="handled"
+      >
         <View className="flex-1 justify-center px-6 py-12">
           <Image
             source={require("../../assets/images/kribb.png")}
-            className="w-32 h-16 mb-8"
+            className="w-12 h-16 mb-8"
             resizeMode="contain"
           />
           <Text className="text-3xl font-bold text-gray-800 mb-2">
@@ -92,7 +105,7 @@ export default function SignUp() {
           <TouchableOpacity
             onPress={onVerifyPress}
             disabled={isLoading}
-            className="bg-blue-500 py-4 rounded-md items-center mb-4"
+            className="bg-blue-500 my-4 py-4 rounded-md items-center mb-4"
           >
             {isLoading ? (
               <ActivityIndicator color={"white"} />
@@ -108,9 +121,9 @@ export default function SignUp() {
             <Text className="text-blue-600">I need a new code</Text>
           </TouchableOpacity>
         </View>
-      );
-    }
-  };
+      </ScrollView>
+    );
+  }
 
   return (
     <ScrollView
@@ -121,7 +134,7 @@ export default function SignUp() {
       <View className="flex-1 justify-center px-6 py-12">
         <Image
           source={require("../../assets/images/kribb.png")}
-          className="w-32 h-16 mb-8"
+          className="w-12 h-12 mb-8"
           resizeMode="contain"
         />
         <Text className="text-3xl font-bold text-gray-800 mb-2">
@@ -162,7 +175,7 @@ export default function SignUp() {
           </Text>
         )}
         <TextInput
-          className="w-full border border-gray-300 rounded-xl px-4 py-3 mb-6"
+          className="w-full mt-4 border border-gray-300 rounded-xl px-4 py-3 mb-6"
           placeholder="Password"
           placeholderTextColor={"#9CA3AF"}
           value={password}
