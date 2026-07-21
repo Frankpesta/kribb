@@ -25,6 +25,93 @@ export default function SignUp() {
 
   const isLoading = fetchStatus === "fetching";
 
+  if (signUp.status === "complete" || isSignedIn) {
+    return null;
+  }
+
+  const onSignUpPress = async () => {
+    const { error } = await signUp.password({
+      emailAddress: email,
+      password,
+      firstName,
+      lastName,
+    });
+
+    if (error) {
+      console.error(JSON.stringify(error.message, null, 2));
+      alert(error.message);
+      return;
+    }
+
+    if (!error) await signUp.verifications.sendEmailCode();
+
+    const onVerifyPress = async () => {
+      await signUp.verifications.verifyEmailCode({
+        code,
+      });
+      if (signUp.status === "complete") {
+        await signUp.finalize({
+          navigate: ({ decorateUrl }) => {
+            const url = decorateUrl("/");
+            router.replace(url as any);
+          },
+        });
+      }
+    };
+
+    if (
+      signUp.status === "missing_requirements" &&
+      signUp.unverifiedFields.includes("email_address") &&
+      signUp.missingFields.length === 0
+    ) {
+      return (
+        <View className="flex-1 justify-center px-6 py-12">
+          <Image
+            source={require("../../assets/images/kribb.png")}
+            className="w-32 h-16 mb-8"
+            resizeMode="contain"
+          />
+          <Text className="text-3xl font-bold text-gray-800 mb-2">
+            Verify Your Account
+          </Text>
+          <Text className="text-gray-500 mb-8">We sent a code to {email}</Text>
+          <TextInput
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-3"
+            placeholder="Enter verification code"
+            placeholderTextColor={"#9CA3AF"}
+            value={code}
+            keyboardType="number-pad"
+            onChangeText={setCode}
+          />
+          {errors.fields.code && (
+            <Text className="text-red-500 mb-4">
+              {errors.fields.code.message}
+            </Text>
+          )}
+
+          <TouchableOpacity
+            onPress={onVerifyPress}
+            disabled={isLoading}
+            className="bg-blue-500 py-4 rounded-md items-center mb-4"
+          >
+            {isLoading ? (
+              <ActivityIndicator color={"white"} />
+            ) : (
+              <Text className="text-white font-bold text-base">Verify</Text>
+            )}
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => signUp.verifications.sendEmailCode()}
+            className="py-2"
+          >
+            <Text className="text-blue-600">I need a new code</Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+  };
+
   return (
     <ScrollView
       contentContainerStyle={{ flexGrow: 1 }}
@@ -89,6 +176,7 @@ export default function SignUp() {
         )}
 
         <TouchableOpacity
+          onPress={onSignUpPress}
           disabled={isLoading}
           className="bg-blue-500 py-4 rounded-md items-center mb-4"
         >
